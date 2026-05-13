@@ -1,44 +1,43 @@
 import admin from "firebase-admin";
-import dotenv from "dotenv";
 
-// Initialize dotenv
-dotenv.config();
-
-const initializeAdmin = () => {
+/**
+ * Vercel Environment Firebase Initializer
+ */
+const getFirebaseAdmin = () => {
   const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
 
   if (!serviceAccountVar) {
     throw new Error(
-      "FIREBASE_SERVICE_ACCOUNT is undefined. " +
-      "If local: check your .env file. " +
-      "If production: add the variable to your hosting dashboard."
+      "FIREBASE_SERVICE_ACCOUNT is missing. " + 
+      "Ensure you have redeployed after adding the variable to the Vercel Dashboard."
     );
   }
 
   try {
-    // If the string starts with '{', treat it as a JSON string
-    const serviceAccount = serviceAccountVar.startsWith("{") 
-      ? JSON.parse(serviceAccountVar) 
-      : JSON.parse(Buffer.from(serviceAccountVar, 'base64').toString()); // Fallback for base64 encoded keys
+    // 1. Parse the JSON string from the environment variable
+    const serviceAccount = JSON.parse(serviceAccountVar);
 
-    // Crucial: Fix the escaped newlines in the private key
+    // 2. Fix the private_key formatting (common Vercel/Newline issue)
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
     }
 
+    // 3. Prevent multiple initializations in Vercel's hot-reloading
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
+      console.log("✅ Firebase Admin successfully initialized.");
     }
 
-    console.log("🚀 Firebase Admin connected successfully.");
     return admin;
   } catch (error) {
-    console.error("❌ Failed to parse Service Account JSON:", error.message);
+    console.error("❌ Firebase Initialization Error:", error.message);
+    // Log helpful diagnostic info (without exposing secrets)
+    console.log("String starts with:", serviceAccountVar.trim().substring(0, 10));
     throw error;
   }
 };
 
-const firebaseAdmin = initializeAdmin();
+const firebaseAdmin = getFirebaseAdmin();
 export default firebaseAdmin;
