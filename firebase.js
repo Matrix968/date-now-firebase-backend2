@@ -1,50 +1,44 @@
 import admin from "firebase-admin";
 import dotenv from "dotenv";
 
+// Initialize dotenv
 dotenv.config();
 
-const initializeFirebase = () => {
-  const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+const initializeAdmin = () => {
+  const serviceAccountVar = process.env.FIREBASE_SERVICE_ACCOUNT;
 
-  if (!serviceAccountRaw) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT is missing from environment variables.");
+  if (!serviceAccountVar) {
+    throw new Error(
+      "FIREBASE_SERVICE_ACCOUNT is undefined. " +
+      "If local: check your .env file. " +
+      "If production: add the variable to your hosting dashboard."
+    );
   }
 
   try {
-    // 1. Parse the JSON
-    const serviceAccount = JSON.parse(serviceAccountRaw);
+    // If the string starts with '{', treat it as a JSON string
+    const serviceAccount = serviceAccountVar.startsWith("{") 
+      ? JSON.parse(serviceAccountVar) 
+      : JSON.parse(Buffer.from(serviceAccountVar, 'base64').toString()); // Fallback for base64 encoded keys
 
-    /**
-     * 2. Extract and sanitize the private key.
-     * The SDK requires the key 'private_key' (snake_case).
-     * We also fix common escaping issues found in CI/CD and .env files.
-     */
-    let pKey = serviceAccount.private_key || serviceAccount.privateKey;
-
-    if (!pKey) {
-      throw new Error("No private key found in the service account object.");
+    // Crucial: Fix the escaped newlines in the private key
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
     }
 
-    // Replace literal '\n' strings with actual newline characters
-    serviceAccount.private_key = pKey.replace(/\\n/g, '\n');
-
-    // 3. Initialize the app if not already initialized
-    if (admin.apps.length === 0) {
+    if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-      console.log("✅ Firebase Admin initialized successfully.");
     }
 
+    console.log("🚀 Firebase Admin connected successfully.");
     return admin;
   } catch (error) {
-    console.error("❌ Firebase Initialization Error:", error.message);
-    // Log the first few characters of the raw string to debug (DO NOT log the whole key)
-    console.log("Raw String Start:", serviceAccountRaw.substring(0, 30));
+    console.error("❌ Failed to parse Service Account JSON:", error.message);
     throw error;
   }
 };
 
-const firebaseAdmin = initializeFirebase();
-
+const firebaseAdmin = initializeAdmin();
 export default firebaseAdmin;
