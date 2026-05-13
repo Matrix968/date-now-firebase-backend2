@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Firebase Admin Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        .user-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; display: flex; justify-content: space-between; }
+        button { cursor: pointer; background: #ff4444; color: white; border: none; padding: 5px 10px; border-radius: 3px; }
+        .refresh-btn { background: #4444ff; margin-bottom: 20px; padding: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Firebase User Manager</h1>
+    <button class="refresh-btn" onclick="fetchUsers()">Fetch/Refresh Users</button>
+    
+    <div id="user-list">
+        <!-- Users will appear here -->
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:3000";
+
+        // 1. GET: Fetch all users from your Backend
+        async function fetchUsers() {
+    try {
+        const response = await axios.get(`${API_BASE}/users`);
+        console.log("Server Response:", response.data); // Debugging line
+
+        // Use the correct key from your backend res.json
+        const userArray = response.data.user || response.data.users || [];
+
+        const listDiv = document.getElementById('user-list');
+        
+        if (userArray.length === 0) {
+            listDiv.innerHTML = "<p>No users found.</p>";
+            return;
+        }
+
+        listDiv.innerHTML = userArray.map(user => `
+            <div class="user-card">
+                <div>
+                    <strong>${user.name || 'No Name'}</strong><br>
+                    <small>${user.email}</small>
+                </div>
+                <button onclick="deleteUser('${user.uid}')">Delete</button>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error("Error fetching users:", err);
+    }
+}
+        // 2. DELETE: Tell the backend to remove a user
+        async function deleteUser(uid) {
+            if (!confirm("Are you sure?")) return;
+            
+            try {
+                await axios.delete(`${API_BASE}/users/${uid}`);
+                alert("User deleted!");
+                fetchUsers(); // Refresh the list
+            } catch (err) {
+                console.error("Error deleting user:", err);
+            }
+        }
+    </script>
+</body>
+</html>
